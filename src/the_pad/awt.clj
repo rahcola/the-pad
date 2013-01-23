@@ -1,9 +1,13 @@
 (ns the-pad.awt
   (:require [the-pad.picture :as p])
   (:require [the-pad.util :as u])
-  (:import [java.awt Frame Color GraphicsEnvironment Polygon]
+  (:import [java.awt
+            Frame Color
+            Graphics2D GraphicsEnvironment
+            Polygon Rectangle
+            EventQueue RenderingHints]
            [java.awt.geom Path2D$Double Ellipse2D$Double]
-           [java.awt.event WindowListener]))
+           [java.awt.event WindowAdapter]))
 
 (defprotocol ARenderable
   (render [this graphics bounds]))
@@ -22,6 +26,13 @@
         (.addPoint awt-poly (int x) (int y)))
       (.fill graphics awt-poly))))
 
+(extend-type the_pad.picture.Rectangle
+  ARenderable
+  (render [{:keys [width height]} graphics _]
+    (.fill graphics
+           (Rectangle. (- (/ width 2)) (- (/ height 2))
+                       width height))))
+
 (extend-type the_pad.picture.Line
   ARenderable
   (render [{:keys [path]} graphics _]
@@ -35,7 +46,9 @@
 (extend-type the_pad.picture.Circle
   ARenderable
   (render [{:keys [radius]} graphics _]
-    (.fill graphics (Ellipse2D$Double. 0 0 radius radius))))
+    (.fill graphics
+           (Ellipse2D$Double. (- (/ radius 2)) (- (/ radius 2))
+                              radius radius))))
 
 (extend-type the_pad.picture.Color
   ARenderable
@@ -59,54 +72,65 @@
                 (.x bounds) (.y bounds)
                 (.width bounds) (.height bounds))))
 
-(defn ->frame [title width height]
-  (doto (-> (GraphicsEnvironment/getLocalGraphicsEnvironment)
-            (.getDefaultScreenDevice)
-            (.getDefaultConfiguration)
-            (Frame.))
-    (.setIgnoreRepaint true)
-    (.setTitle title)
-    (.setSize width height)
-    (.setResizable true)
-    (.setVisible true)
-    (.createBufferStrategy 2)))
+(defn dispose-on-close-listener [open]
+  (proxy [WindowAdapter] []
+    (windowClosing [e]
+      (swap! open (constantly false))
+      (.dispose (.getWindow e)))))
 
-(defn dispose-on-close-listener [frame]
-  (reify WindowListener
-    (windowActivated [this _])
-    (windowClosed [this _])
-    (windowClosing [this e]
-      (swap! frame (fn [frame]
-                     (.dispose frame)
-                     false)))
-    (windowDeactivated [this _])
-    (windowDeiconified [this _])
-    (windowIconified [this _])
-    (windowOpened [this _])))
-
-(defn add-window-listener [frame listener]
-  (doto frame (.addWindowListener listener)))
+(defn ->frame [{:keys [title width height]}]
+  (let [frame (-> (GraphicsEnvironment/getLocalGraphicsEnvironment)
+                  (.getDefaultScreenDevice)
+                  (.getDefaultConfiguration)
+                  (Frame.))]
+    (doto frame
+      (.setTitle title)
+      (.setUndecorated true)
+      (.setBackground (Color. 255 255 255 255))
+      (.setIgnoreRepaint true)
+      (.setResizable false)
+      (.setSize width height)
+      (.setVisible true)
+      (.createBufferStrategy 2))))
 
 (defprotocol AScreen
   (open? [screen])
   (draw! [screen geometry]))
 
-(deftype Screen [frame]
-  AScreen
-  (open? [_]
-    (not (nil? @frame)))
-  (draw! [_ geometry]
-    (swap! frame (fn [frame]
-                   (if frame
-                     (let [b (.getBufferStrategy frame)
-                           graphics (.getDrawGraphics b)
-                           bounds (.getBounds frame)]
-                       (render geometry graphics bounds)
-                       (.show b)
-                       (.dispose graphics)
-                       frame))))))
+(defn awt-run-sync! [task]
+  (EventQueue/invokeAndWait task))
 
-(defn ->Screen [title width height]
-  (let [frame (atom (->frame title width height))]
-    (swap! frame add-window-listener (dispose-on-close-listener frame))
-    (Screen. frame)))
+(defn set-rendering-hints [graphics]
+  (doto graphics
+    (.setRenderingHint RenderingHints/KEY_RENDERING
+                       RenderingHints/VALUE_RENDER_SPEED)
+    (.setRenderingHint RenderingHints/KEY_ANTIALIASING
+                       RenderingHints/VALUE_ANTIALIAS_OFF)))
+
+(deftype Screen [frame open]
+  AScreen
+  (open? [_] @open)
+  (draw! [_ geometry]
+    (awt-run-sync!
+     (fn []
+       (swap! frame
+              (fn [frame]
+                (if (.isDisplayable frame)
+                  (let [b (.getBufferStrategy frame)
+                        graphics (cast Graphics2D (.getDrawGraphics b))
+                        bounds (.getBounds frame)]
+                    (set-rendering-hints graphics)
+                    (render geometry graphics bounds)
+                    (.show b)
+                    (.dispose graphics)))
+                frame))))))
+
+(defn ->Screen [a]
+  (let [frame (atom nil)
+        open (atom true)]
+    (awt-run-sync! (fn []
+                     (let [e (dispose-on-close-listener open)
+                           f (->frame a)]
+                       (.addWindowListener f e)
+                       (swap! frame (constantly f)))))
+    (Screen. frame open)))

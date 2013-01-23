@@ -5,6 +5,8 @@
 
 (defrecord Polygon [path])
 
+(defrecord Rectangle [width height])
+
 (defrecord Line [path])
 
 (defrecord Circle [radius])
@@ -21,6 +23,7 @@
 (def h (-> (make-hierarchy)
            (derive Pictures Picture)
            (derive Polygon Picture)
+           (derive Rectangle Picture)
            (derive Line Picture)
            (derive Circle Picture)
            (derive Color Picture)
@@ -49,6 +52,7 @@
 
 (extend Pictures u/Monoid monoid-impl)
 (extend Polygon u/Monoid monoid-impl)
+(extend Rectangle u/Monoid monoid-impl)
 (extend Line u/Monoid monoid-impl)
 (extend Circle u/Monoid monoid-impl)
 (extend Color u/Monoid monoid-impl)
