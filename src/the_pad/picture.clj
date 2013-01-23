@@ -13,6 +13,10 @@
 
 (defrecord Rotate [angle])
 
+(defrecord Translate [x y])
+
+(defrecord Blank [])
+
 (def Picture ::root)
 (def h (-> (make-hierarchy)
            (derive Pictures Picture)
@@ -20,7 +24,9 @@
            (derive Line Picture)
            (derive Circle Picture)
            (derive Color Picture)
-           (derive Rotate Picture)))
+           (derive Rotate Picture)
+           (derive Translate Picture)
+           (derive Blank Picture)))
 
 (defmulti pictures (fn [a b] [(type a) (type b)])
   :hierarchy #'h)
@@ -47,9 +53,16 @@
 (extend Circle u/Monoid monoid-impl)
 (extend Color u/Monoid monoid-impl)
 (extend Rotate u/Monoid monoid-impl)
+(extend Translate u/Monoid monoid-impl)
+(extend Blank u/Monoid monoid-impl)
 
 (defn color [c picture]
   (u/mappend c picture))
 
 (defn rotate [angle picture]
   (u/mappend (Rotate. angle) picture))
+
+(defn translate [x y picture]
+  (u/mappend (Translate. x y) picture))
+
+(def blank (Blank.))

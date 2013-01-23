@@ -6,17 +6,17 @@
            [java.awt.event WindowListener]))
 
 (defprotocol ARenderable
-  (render [this graphics]))
+  (render [this graphics bounds]))
 
 (extend-type the_pad.picture.Pictures
   ARenderable
-  (render [{:keys [objects]} graphics]
+  (render [{:keys [objects]} graphics bounds]
     (doseq [o objects]
-      (render o graphics))))
+      (render o graphics bounds))))
 
 (extend-type the_pad.picture.Polygon
   ARenderable
-  (render [{:keys [path]} graphics]
+  (render [{:keys [path]} graphics _]
     (let [awt-poly (Polygon.)]
       (doseq [[x y] path]
         (.addPoint awt-poly (int x) (int y)))
@@ -24,7 +24,7 @@
 
 (extend-type the_pad.picture.Line
   ARenderable
-  (render [{:keys [path]} graphics]
+  (render [{:keys [path]} graphics _]
     (let [awt-path (Path2D$Double.)
           [[x y] & rest] path]
       (.moveTo awt-path (double x) (double y))
@@ -34,18 +34,30 @@
 
 (extend-type the_pad.picture.Circle
   ARenderable
-  (render [{:keys [radius]} graphics]
+  (render [{:keys [radius]} graphics _]
     (.fill graphics (Ellipse2D$Double. 0 0 radius radius))))
 
 (extend-type the_pad.picture.Color
   ARenderable
-  (render [{:keys [red green blue]} graphics]
+  (render [{:keys [red green blue]} graphics _]
     (.setColor graphics (Color. red green blue))))
 
 (extend-type the_pad.picture.Rotate
   ARenderable
-  (render [{:keys [angle]} graphics]
+  (render [{:keys [angle]} graphics _]
     (.rotate graphics (u/degree->radians angle))))
+
+(extend-type the_pad.picture.Translate
+  ARenderable
+  (render [{:keys [x y]} graphics _]
+    (.translate graphics x y)))
+
+(extend-type the_pad.picture.Blank
+  ARenderable
+  (render [_ graphics bounds]
+    (.clearRect graphics
+                (.x bounds) (.y bounds)
+                (.width bounds) (.height bounds))))
 
 (defn ->frame [title width height]
   (doto (-> (GraphicsEnvironment/getLocalGraphicsEnvironment)
@@ -55,7 +67,7 @@
     (.setIgnoreRepaint true)
     (.setTitle title)
     (.setSize width height)
-    (.setResizable false)
+    (.setResizable true)
     (.setVisible true)
     (.createBufferStrategy 2)))
 
@@ -76,17 +88,20 @@
   (doto frame (.addWindowListener listener)))
 
 (defprotocol AScreen
+  (open? [screen])
   (draw! [screen geometry]))
 
 (deftype Screen [frame]
   AScreen
+  (open? [_]
+    (not (nil? @frame)))
   (draw! [_ geometry]
     (swap! frame (fn [frame]
                    (if frame
                      (let [b (.getBufferStrategy frame)
                            graphics (.getDrawGraphics b)
                            bounds (.getBounds frame)]
-                       (render geometry graphics)
+                       (render geometry graphics bounds)
                        (.show b)
                        (.dispose graphics)
                        frame))))))
