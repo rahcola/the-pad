@@ -5,7 +5,8 @@
             Frame Color
             Graphics2D GraphicsEnvironment
             Polygon Rectangle
-            EventQueue RenderingHints]
+            EventQueue RenderingHints
+            Toolkit]
            [java.awt.geom Path2D$Double Ellipse2D$Double]
            [java.awt.event WindowAdapter]))
 
@@ -79,21 +80,16 @@
       (.dispose (.getWindow e)))))
 
 (defn ->frame [{:keys [title width height color]}]
-  (let [frame (-> (GraphicsEnvironment/getLocalGraphicsEnvironment)
-                  (.getDefaultScreenDevice)
-                  (.getDefaultConfiguration)
-                  (Frame.))]
-    (doto frame
-      (.setTitle title)
-      (.setUndecorated true)
-      (.setBackground (Color. (:red color)
-                              (:green color)
-                              (:blue color)))
-      (.setIgnoreRepaint true)
-      (.setResizable true)
-      (.setSize width height)
-      (.setVisible true)
-      (.createBufferStrategy 2))))
+  (doto (Frame. title)
+    (.setUndecorated false)
+    (.setBackground (Color. (:red color)
+                            (:green color)
+                            (:blue color)))
+    (.setIgnoreRepaint false)
+    (.setResizable true)
+    (.setSize width height)
+    (.setVisible true)
+    (.createBufferStrategy 2)))
 
 (defprotocol AScreen
   (open? [screen])
@@ -115,7 +111,7 @@
     (.setRenderingHint RenderingHints/KEY_DITHERING
                        RenderingHints/VALUE_DITHER_ENABLE)
     (.setRenderingHint RenderingHints/KEY_ANTIALIASING
-                       RenderingHints/VALUE_ANTIALIAS_ON)))
+                       RenderingHints/VALUE_ANTIALIAS_OFF)))
 
 (deftype Screen [frame open]
   AScreen
@@ -131,8 +127,9 @@
                         bounds (.getBounds frame)]
                     (set-rendering-hints graphics)
                     (render geometry graphics bounds)
+                    (.dispose graphics)
                     (.show b)
-                    (.dispose graphics)))
+                    (.sync (Toolkit/getDefaultToolkit))))
                 frame))))))
 
 (defn ->Screen [a]
