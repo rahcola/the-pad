@@ -69,7 +69,7 @@
   ARenderable
   (render [_ graphics bounds]
     (.clearRect graphics
-                (.x bounds) (.y bounds)
+                0 0
                 (.width bounds) (.height bounds))))
 
 (defn dispose-on-close-listener [open]
@@ -78,7 +78,7 @@
       (swap! open (constantly false))
       (.dispose (.getWindow e)))))
 
-(defn ->frame [{:keys [title width height]}]
+(defn ->frame [{:keys [title width height color]}]
   (let [frame (-> (GraphicsEnvironment/getLocalGraphicsEnvironment)
                   (.getDefaultScreenDevice)
                   (.getDefaultConfiguration)
@@ -86,9 +86,11 @@
     (doto frame
       (.setTitle title)
       (.setUndecorated true)
-      (.setBackground (Color. 255 255 255 255))
+      (.setBackground (Color. (:red color)
+                              (:green color)
+                              (:blue color)))
       (.setIgnoreRepaint true)
-      (.setResizable false)
+      (.setResizable true)
       (.setSize width height)
       (.setVisible true)
       (.createBufferStrategy 2))))
@@ -103,9 +105,17 @@
 (defn set-rendering-hints [graphics]
   (doto graphics
     (.setRenderingHint RenderingHints/KEY_RENDERING
-                       RenderingHints/VALUE_RENDER_SPEED)
+                       RenderingHints/VALUE_RENDER_QUALITY)
+    (.setRenderingHint RenderingHints/KEY_STROKE_CONTROL
+                       RenderingHints/VALUE_STROKE_NORMALIZE)
+    (.setRenderingHint RenderingHints/KEY_ALPHA_INTERPOLATION
+                       RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY)
+    (.setRenderingHint RenderingHints/KEY_COLOR_RENDERING
+                       RenderingHints/VALUE_COLOR_RENDER_QUALITY)
+    (.setRenderingHint RenderingHints/KEY_DITHERING
+                       RenderingHints/VALUE_DITHER_ENABLE)
     (.setRenderingHint RenderingHints/KEY_ANTIALIASING
-                       RenderingHints/VALUE_ANTIALIAS_OFF)))
+                       RenderingHints/VALUE_ANTIALIAS_ON)))
 
 (deftype Screen [frame open]
   AScreen
