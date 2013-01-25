@@ -21,7 +21,6 @@
               (recur (- (System/currentTimeMillis) t0))))))))
 
 (defn -main
-  "I don't do a whole lot."
   [& args]
   (let [screen (awt/->Screen {:title "Window"
                               :width 400

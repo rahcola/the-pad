@@ -7,8 +7,9 @@
             Polygon Rectangle
             EventQueue RenderingHints
             Toolkit]
-           [java.awt.geom Path2D$Double Ellipse2D$Double]
-           [java.awt.event WindowAdapter]))
+           [java.awt.image BufferedImage AffineTransformOp]
+           [java.awt.geom Path2D$Double Ellipse2D$Double AffineTransform]
+           [java.awt.event WindowAdapter ComponentAdapter]))
 
 (defprotocol ARenderable
   (render [this graphics bounds]))
@@ -73,23 +74,42 @@
                 0 0
                 (.width bounds) (.height bounds))))
 
-(defn dispose-on-close-listener [open]
+(defn ->frame [{:keys [title width height color]}]
+  (doto (Frame. title)
+    (.setBackground (Color. (:red color)
+                            (:green color)
+                            (:blue color)))
+    (.setIgnoreRepaint true)
+    (.setResizable true)
+    (.setSize width height)
+    (.setVisible true)))
+
+(defn ->frame-buffer [frame]
+  (let [gc (.getGraphicsConfiguration frame)
+        w (.getWidth frame)
+        h (.getHeight frame)]
+    (.createCompatibleImage gc (* 2 w) (* 2 h))))
+
+(defn window-listener [open]
   (proxy [WindowAdapter] []
+    (windowOpened [_]
+      (swap! open (constantly true)))
     (windowClosing [e]
       (swap! open (constantly false))
       (.dispose (.getWindow e)))))
 
-(defn ->frame [{:keys [title width height color]}]
-  (doto (Frame. title)
-    (.setUndecorated false)
-    (.setBackground (Color. (:red color)
-                            (:green color)
-                            (:blue color)))
-    (.setIgnoreRepaint false)
-    (.setResizable true)
-    (.setSize width height)
-    (.setVisible true)
-    (.createBufferStrategy 2)))
+(defn component-listener [buffer]
+  (proxy [ComponentAdapter] []
+    (componentResized [e]
+      (let [frame (.getComponent e)
+            fw (.getWidth frame)
+            fh (.getHeight frame)]
+        (swap! buffer
+               (fn [buffer]
+                 (if (and (= (* 2 fw) (.getWidth buffer))
+                          (= (* 2 fh) (.getHeight buffer)))
+                   buffer
+                   (->frame-buffer frame))))))))
 
 (defprotocol AScreen
   (open? [screen])
@@ -111,9 +131,9 @@
     (.setRenderingHint RenderingHints/KEY_DITHERING
                        RenderingHints/VALUE_DITHER_ENABLE)
     (.setRenderingHint RenderingHints/KEY_ANTIALIASING
-                       RenderingHints/VALUE_ANTIALIAS_OFF)))
+                       RenderingHints/VALUE_ANTIALIAS_ON)))
 
-(deftype Screen [frame open]
+(deftype Screen [frame buffer open]
   AScreen
   (open? [_] @open)
   (draw! [_ geometry]
@@ -122,22 +142,36 @@
        (swap! frame
               (fn [frame]
                 (if (.isDisplayable frame)
-                  (let [b (.getBufferStrategy frame)
-                        graphics (cast Graphics2D (.getDrawGraphics b))
+                  (let [frame-graphics (cast Graphics2D (.getGraphics frame))
+                        buffer-graphics (.createGraphics @buffer)
                         bounds (.getBounds frame)]
-                    (set-rendering-hints graphics)
-                    (render geometry graphics bounds)
-                    (.dispose graphics)
-                    (.show b)
+                    (set-rendering-hints frame-graphics)
+                    (set-rendering-hints buffer-graphics)
+                    (.setBackground buffer-graphics (.getBackground frame))
+                    (.scale buffer-graphics 2 2)
+                    (render geometry buffer-graphics bounds)
+                    (.drawImage frame-graphics
+                                @buffer
+                                (AffineTransformOp.
+                                 (AffineTransform/getScaleInstance 0.5 0.5)
+                                 (AffineTransformOp/TYPE_BICUBIC))
+                                0 0)
+                    (.dispose frame-graphics)
+                    (.dispose buffer-graphics)
                     (.sync (Toolkit/getDefaultToolkit))))
                 frame))))))
 
 (defn ->Screen [a]
   (let [frame (atom nil)
+        buffer (atom nil)
         open (atom true)]
     (awt-run-sync! (fn []
-                     (let [e (dispose-on-close-listener open)
-                           f (->frame a)]
-                       (.addWindowListener f e)
-                       (swap! frame (constantly f)))))
-    (Screen. frame open)))
+                     (let [wl (window-listener open)
+                           f (->frame a)
+                           fb (->frame-buffer f)
+                           cl (component-listener buffer)]
+                       (.addWindowListener f wl)
+                       (.addComponentListener f cl)
+                       (swap! frame (constantly f))
+                       (swap! buffer (constantly fb)))))
+    (Screen. frame buffer open)))
