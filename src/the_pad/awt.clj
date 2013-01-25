@@ -1,4 +1,5 @@
 (ns the-pad.awt
+  (:require [the-pad.screen :as s])
   (:require [the-pad.picture :as p])
   (:require [the-pad.util :as u])
   (:import [java.awt
@@ -111,10 +112,6 @@
                    buffer
                    (->frame-buffer frame))))))))
 
-(defprotocol AScreen
-  (open? [screen])
-  (draw! [screen geometry]))
-
 (defn awt-run-sync! [task]
   (EventQueue/invokeAndWait task))
 
@@ -134,7 +131,7 @@
                        RenderingHints/VALUE_ANTIALIAS_ON)))
 
 (deftype Screen [frame buffer open]
-  AScreen
+  s/AScreen
   (open? [_] @open)
   (draw! [_ geometry]
     (awt-run-sync!
@@ -144,7 +141,8 @@
                 (if (.isDisplayable frame)
                   (let [frame-graphics (cast Graphics2D (.getGraphics frame))
                         buffer-graphics (.createGraphics @buffer)
-                        bounds (.getBounds frame)]
+                        bounds (.getBounds frame)
+                        transform (AffineTransform/getScaleInstance 0.5 0.5)]
                     (set-rendering-hints frame-graphics)
                     (set-rendering-hints buffer-graphics)
                     (.setBackground buffer-graphics (.getBackground frame))
@@ -153,7 +151,7 @@
                     (.drawImage frame-graphics
                                 @buffer
                                 (AffineTransformOp.
-                                 (AffineTransform/getScaleInstance 0.5 0.5)
+                                 transform
                                  (AffineTransformOp/TYPE_BICUBIC))
                                 0 0)
                     (.dispose frame-graphics)

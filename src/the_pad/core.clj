@@ -1,7 +1,9 @@
 (ns the-pad.core
-  (:require [the-pad.awt :as awt]
-            [the-pad.picture :as p]
-            [the-pad.util :as u]))
+  (:require [the-pad.screen :as s])
+  (:require [the-pad.util :as u])
+  (:require [the-pad.picture :as p])
+  (:require [the-pad.awt :as awt])
+  (:require [the-pad.opengl :as gl]))
 
 (defn limit [start fps]
   (let [delta (- (System/currentTimeMillis) start)
@@ -15,25 +17,27 @@
     (loop [t 0]
       (let [start (System/currentTimeMillis)
             picture (update t)]
-        (awt/draw! screen picture)
-        (if (awt/open? screen)
-          (do (limit start 60)
-              (recur (- (System/currentTimeMillis) t0))))))))
+        (s/draw! screen picture)
+        (if (s/open? screen)
+          (recur (- (System/currentTimeMillis) t0)))))))
 
 (defn -main
   [& args]
-  (let [screen (awt/->Screen {:title "Window"
-                              :width 400
-                              :height 400
-                              :color {:red 255 :green 255 :blue 255}
-                              :full-screen false})
-        l (u/mappend (p/color (p/->Color 100 100 100)
-                              (p/->Rectangle 100 100))
-                     (p/color (p/->Color 0 0 0)
-                              (p/->Line [[0 0] [0 -50]])))]
+  (let [screen (gl/->Screen {:title "Window"
+                             :width 400
+                             :height 400
+                             :color {:red 255 :green 255 :blue 255}
+                             :full-screen false})
+        cw (p/color (p/->Color 0.1 0.1 0.1)
+                    (p/->Rectangle 0.25 0.25))
+        ccw (p/color (p/->Color 0.9 0.9 0.9)
+                     (p/->Rectangle 0.25 0.25))]
     (animate screen
              (fn [t]
-               (let [angle (* t (/ 360 5000))]
-                 (u/mappend p/blank
-                            (p/translate 200 200
-                                         (p/rotate angle l))))))))
+               (let [angle (* (/ t 1000) 45)]
+                 (u/mappend
+                  (p/color (p/->Color 0.5 0.5 0.5)
+                           p/blank)
+                  (u/mappend
+                   (p/translate 0.1 0 (p/rotate angle cw))
+                   (p/translate -0.1 0 (p/rotate (- angle) ccw)))))))))

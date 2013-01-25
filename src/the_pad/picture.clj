@@ -1,7 +1,7 @@
 (ns the-pad.picture
   (:require [the-pad.util :as u]))
 
-(defrecord Pictures [objects])
+(defrecord Pictures [pictures])
 
 (defrecord Polygon [path])
 
@@ -13,9 +13,9 @@
 
 (defrecord Color [red green blue])
 
-(defrecord Rotate [angle])
+(defrecord Rotate [angle picture])
 
-(defrecord Translate [x y])
+(defrecord Translate [x y picture])
 
 (defrecord Blank [])
 
@@ -35,13 +35,13 @@
   :hierarchy #'h)
 
 (defmethod pictures [Pictures Pictures] [a b]
-  (Pictures. (vec (concat (:objects a) (:objects b)))))
+  (Pictures. (vec (concat (:pictures a) (:pictures b)))))
 
 (defmethod pictures [Pictures Picture] [a b]
-  (Pictures. (conj (:objects a) b)))
+  (Pictures. (conj (:pictures a) b)))
 
 (defmethod pictures [Picture Pictures] [a b]
-  (Pictures. (vec (cons a (:objects b)))))
+  (Pictures. (vec (cons a (:pictures b)))))
 
 (defmethod pictures [Picture Picture] [a b]
   (Pictures. [a b]))
@@ -64,9 +64,9 @@
   (u/mappend c picture))
 
 (defn rotate [angle picture]
-  (u/mappend (Rotate. angle) picture))
+  (Rotate. angle picture))
 
 (defn translate [x y picture]
-  (u/mappend (Translate. x y) picture))
+  (Translate. x y picture))
 
 (def blank (Blank.))

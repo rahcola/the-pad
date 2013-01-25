@@ -4,8 +4,5 @@
   (mempty [this])
   (mappend [this a]))
 
-(defn mconcat [& ms]
-  (reduce mappend mempty ms))
-
 (defn degree->radians [x]
   (* x (/ Math/PI 180)))
