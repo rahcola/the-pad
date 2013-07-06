@@ -1,43 +1,52 @@
 (ns the-pad.core
-  (:require [the-pad.screen :as s])
-  (:require [the-pad.util :as u])
-  (:require [the-pad.picture :as p])
+  (:require [the-pad.line :as l])
+  (:require [the-pad.primitives.segment :as s])
+  (:require [the-pad.primitives.trail :as t])
+  (:require [the-pad.render :as r])
   (:require [the-pad.awt :as awt])
-  (:require [the-pad.opengl :as gl]))
+  (:import javax.swing.JFrame)
+  (:import java.awt.Dimension)
+  (:import java.awt.Canvas)
+  (:import java.awt.Graphics2D))
 
-(defn limit [start fps]
-  (let [delta (- (System/currentTimeMillis) start)
-        time-per-frame (/ 1000 fps)
-        sleep (- time-per-frame delta)]
-    (if (> sleep 0)
-      (Thread/sleep sleep))))
+(defn ->window [name width height exit-on-close?]
+  (let [f (new JFrame name)
+        panel (.getContentPane f)
+        canvas (new Canvas)]
+    (when exit-on-close?
+      (.setDefaultCloseOperation f JFrame/EXIT_ON_CLOSE))
+    (.setPreferredSize panel (new Dimension width height))
+    (.setLayout panel nil)
+    (.setBounds canvas 0 0 width height)
+    (.add panel canvas)
+    (.setIgnoreRepaint canvas true)
+    (.pack f)
+    (.setResizable f false)
+    (.setVisible f true)
+    (.createBufferStrategy canvas 2)
+    {:frame f
+     :width width
+     :height height
+     :strategy (.getBufferStrategy canvas)}))
 
-(defn animate [screen update]
-  (let [t0 (System/currentTimeMillis)]
-    (loop [t 0]
-      (let [start (System/currentTimeMillis)
-            picture (update t)]
-        (s/draw! screen picture)
-        (if (s/open? screen)
-          (recur (- (System/currentTimeMillis) t0)))))))
+(defn draw! [window shapes]
+  (let [w (:width window)
+        h (:height window)
+        g (cast Graphics2D (.getDrawGraphics (:strategy window)))]
+    (.translate g (/ w 2) (/ h 2))
+    (.scale g 1 -1)
+    (.setColor g (java.awt.Color/BLACK))
+    (doseq [shape shapes]
+      (.draw g shape)
+      (.fill g shape))
+    (.dispose g)
+    (.show (:strategy window))))
 
 (defn -main
   [& args]
-  (let [screen (gl/->Screen {:title "Window"
-                             :width 400
-                             :height 400
-                             :color {:red 255 :green 255 :blue 255}
-                             :full-screen false})
-        cw (p/color (p/->Color 0.1 0.1 0.1)
-                    (p/->Rectangle 0.25 0.25))
-        ccw (p/color (p/->Color 0.9 0.9 0.9)
-                     (p/->Rectangle 0.25 0.25))]
-    (animate screen
-             (fn [t]
-               (let [angle (* (/ t 1000) 45)]
-                 (u/mappend
-                  (p/color (p/->Color 0.5 0.5 0.5)
-                           p/blank)
-                  (u/mappend
-                   (p/translate 0.1 0 (p/rotate angle cw))
-                   (p/translate -0.1 0 (p/rotate (- angle) ccw)))))))))
+  (let [w (->window "foo" 800 600 true)]
+    (draw! w [(r/render (l/h-rule 800) awt/AWT)
+              (r/render (l/v-rule 600) awt/AWT)
+              (r/render (t/trail [(s/linear [10 10])
+                                  (s/cubic [-10 50] [60 50] [90 0])]
+                                 true) awt/AWT)])))
