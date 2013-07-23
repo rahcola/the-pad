@@ -1,6 +1,8 @@
 (ns the-pad.vector-space.additive-group
   (:refer-clojure :rename {+ core+
-                           - core-}))
+                           +' core+'
+                           - core-
+                           -' core-'}))
 
 (def AdditiveGroup ::additive-group)
 

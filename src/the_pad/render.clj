@@ -1,4 +1,3 @@
 (ns the-pad.render)
 
-(defmulti render (fn [object backend]
-                   [(type object) backend]))
+(defmulti render (fn [object backend] [(type object) backend]))
